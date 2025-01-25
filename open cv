@@ -1,0 +1,78 @@
+import cv2
+import mediapipe as mp
+
+# Initialize Mediapipe Hand Detection
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+hands = mp_hands.Hands(min_detection_confidence=0.7, min_tracking_confidence=0.7)
+
+# Define button positions and dimensions
+button1 = {'x1': 100, 'y1': 100, 'x2': 200, 'y2': 200}
+button2 = {'x1': 300, 'y1': 100, 'x2': 400, 'y2': 200}
+
+# Helper function to draw buttons on the corners
+def draw_buttons(frame):
+    h, w, _ = frame.shape  # Get frame dimensions
+
+    # Button 1 (Top-Left Corner)
+    button1['x1'], button1['y1'] = 100, 100 ###########$44
+    button1['x2'], button1['y2'] = button1['x1'] + 100, button1['y1'] + 50
+    cv2.rectangle(frame, (button1['x1'], button1['y1']), (button1['x2'], button1['y2']), (0, 255, 0), -1)
+    cv2.putText(frame, 'Button 1', (button1['x1'] + 10, button1['y1'] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+    # Button 2 (Top-Right Corner)
+    button2['x1'], button2['y1'] = w - 110, 100  ###########333
+    button2['x2'], button2['y2'] = button2['x1'] + 100, button2['y1'] + 50
+    cv2.rectangle(frame, (button2['x1'], button2['y1']), (button2['x2'], button2['y2']), (0, 0, 255), -1)
+    cv2.putText(frame, 'Button 2', (button2['x1'] + 10, button2['y1'] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+
+# Check if fingertip is in button area
+def is_inside_button(x, y, button):
+    return button['x1'] < x < button['x2'] and button['y1'] < y < button['y2']
+
+# Start video capture
+cap = cv2.VideoCapture(0)
+
+# Create a named window and set it to full screen
+cv2.namedWindow('Virtual Button Control', cv2.WINDOW_NORMAL)
+cv2.setWindowProperty('Virtual Button Control', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame = cv2.flip(frame, 1)  # Flip horizontally
+    h, w, _ = frame.shape
+
+    # Convert the frame to RGB for Mediapipe
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    result = hands.process(rgb_frame)
+
+    # Draw buttons
+    draw_buttons(frame)
+
+    if result.multi_hand_landmarks:
+        for hand_landmarks in result.multi_hand_landmarks:
+            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+            # Get coordinates of the index fingertip
+            index_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+            x = int(index_finger_tip.x * w)
+            y = int(index_finger_tip.y * h)
+
+            # Check if fingertip is in a button
+            if is_inside_button(x, y, button1):
+                cv2.rectangle(frame, (button1['x1'], button1['y1']), (button1['x2'], button1['y2']), (0, 255, 255), -1)
+            elif is_inside_button(x, y, button2):
+                cv2.rectangle(frame, (button2['x1'], button2['y1']), (button2['x2'], button2['y2']), (255, 0, 255), -1)
+
+    cv2.imshow('Virtual Button Control', frame)
+
+    if cv2.waitKey(1) & 0xFF == 27:  # Press 'Esc' to exit
+        break
+
+# Cleanup
+cap.release()
+cv2.destroyAllWindows()
